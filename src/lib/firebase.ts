@@ -4,14 +4,14 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOu
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAaVJB8vF6n5jWcAx3HHFK2xW-F3KF6FVQ",
-  authDomain: "blockchain-17cc5.firebaseapp.com",
-  databaseURL: "https://blockchain-17cc5-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "blockchain-17cc5",
-  storageBucket: "blockchain-17cc5.firebasestorage.app",
-  messagingSenderId: "131636394241",
-  appId: "1:131636394241:web:f149dfa297a795473a4300",
-  measurementId: "G-NMTCEDKK2E"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAaVJB8vF6n5jWcAx3HHFK2xW-F3KF6FVQ",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "blockchain-17cc5.firebaseapp.com",
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://blockchain-17cc5-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "blockchain-17cc5",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "blockchain-17cc5.firebasestorage.app",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "131636394241",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:131636394241:web:f149dfa297a795473a4300",
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-NMTCEDKK2E"
 };
 
 // Initialize Firebase (only if not already initialized)
