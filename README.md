@@ -38,7 +38,6 @@ Each product batch is uniquely identifiable and verifiable through QR scanning a
 ### Backend & Database
 - Firebase Realtime Database
 - Firebase Authentication
-- Supabase (future/optional)
 
 ### Blockchain
 - Solidity Smart Contracts

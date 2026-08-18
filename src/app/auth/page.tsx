@@ -81,7 +81,14 @@ export default function AuthPage() {
       }
 
       // Login user
-      login(user)
+      login({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        organization: user.organization || undefined,
+        created_at: new Date().toISOString()
+      })
       
       // Redirect based on role
       switch (user.role) {

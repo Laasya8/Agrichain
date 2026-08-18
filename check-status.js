@@ -16,10 +16,12 @@ if (fs.existsSync(envPath)) {
   
   // Check environment variables
   const checks = [
-    { name: 'Supabase URL', pattern: 'NEXT_PUBLIC_SUPABASE_URL=' },
-    { name: 'Supabase Key', pattern: 'NEXT_PUBLIC_SUPABASE_ANON_KEY=' },
+    { name: 'Firebase API Key', pattern: 'NEXT_PUBLIC_FIREBASE_API_KEY=' },
+    { name: 'Firebase Auth Domain', pattern: 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=' },
+    { name: 'Firebase Database URL', pattern: 'NEXT_PUBLIC_FIREBASE_DATABASE_URL=' },
+    { name: 'Firebase Project ID', pattern: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID=' },
     { name: 'Contract Address', pattern: 'NEXT_PUBLIC_CONTRACT_ADDRESS=' },
-    { name: 'Polygon RPC', pattern: 'NEXT_PUBLIC_POLYGON_RPC_URL=' },
+    { name: 'Blockchain RPC', pattern: 'NEXT_PUBLIC_POLYGON_RPC_URL=' },
     { name: 'Chain ID', pattern: 'NEXT_PUBLIC_CHAIN_ID=' }
   ];
   

@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button'
 
 interface VideoDebugProps {
   isScanning: boolean
+  onStartScanning?: () => void
 }
 
-export function VideoDebug({ isScanning }: VideoDebugProps) {
+export function VideoDebug({ isScanning, onStartScanning }: VideoDebugProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
   const streamRef = useRef<MediaStream | null>(null)
@@ -110,7 +111,7 @@ export function VideoDebug({ isScanning }: VideoDebugProps) {
       ) : (
         <div className="text-center space-y-4">
           <QrCode className="w-24 h-24 text-gray-400 mx-auto" />
-          <Button onClick={startScanning} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={onStartScanning} className="bg-blue-600 hover:bg-blue-700">
             <Camera className="w-4 h-4 mr-2" />
             Start Camera Scanner
           </Button>

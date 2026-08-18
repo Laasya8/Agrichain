@@ -56,9 +56,11 @@ If you want to test the app without blockchain features, the app will now show a
 Your `.env.local` should look like this:
 
 ```env
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=https://pxxyeefekbuhocfqceat.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
+# Firebase Configuration
+NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://your_project.firebaseio.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
 
 # Blockchain Configuration
 NEXT_PUBLIC_POLYGON_RPC_URL=https://rpc-mumbai.maticvigil.com

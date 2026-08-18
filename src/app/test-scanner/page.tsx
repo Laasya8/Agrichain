@@ -21,7 +21,7 @@ export default function TestScannerPage() {
 
   useEffect(() => {
     // Check camera support
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
       setCameraSupported(true)
     } else {
       setCameraSupported(false)

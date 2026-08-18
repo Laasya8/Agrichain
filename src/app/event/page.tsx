@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getBatchByBatchId, createTraceEvent, type Batch } from '@/lib/firebase'
 import { formatDate } from '@/lib/utils'
-import { generateEventHash } from '@/lib/blockchain'
+import { generateEventHash, getRecord, verifyBatchHash, detectTamperedFields } from '@/lib/blockchain'
 import QrScanner from 'qr-scanner'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useAuth } from '@/hooks/useAuth'
@@ -50,6 +50,7 @@ export default function EventPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [isTampered, setIsTampered] = useState(false)
 
   const eventTypes = [
     { value: 'transport', label: 'Transport', icon: '🚚' },
@@ -102,7 +103,7 @@ export default function EventPage() {
           let batchId: string | null = null
           try {
             const url = new URL(result.data)
-            batchId = url.pathname.split('/').pop()
+            batchId = url.pathname.split('/').pop() || null
           } catch {
             batchId = result.data
           }
@@ -153,10 +154,23 @@ export default function EventPage() {
       }
 
       setBatch(result.data)
+      setIsTampered(false)
+
+      // Fetch blockchain proof and check for tampering
+      const blockchainResult = await getRecord(batchId)
+      const targetHash = (blockchainResult.success && blockchainResult.hash && blockchainResult.hash !== "")
+        ? blockchainResult.hash
+        : result.data.blockchain_hash
+
+      if (targetHash) {
+        const verification = verifyBatchHash(result.data, targetHash)
+        setIsTampered(!verification.isMatch)
+      }
     } catch (err) {
       console.error('Error fetching batch:', err)
       setError('Batch not found. Please scan a valid QR code.')
       setBatch(null)
+      setIsTampered(false)
     }
   }
 
@@ -228,6 +242,7 @@ export default function EventPage() {
     setSuccess(false)
     setError(null)
     setFormData({ eventType: 'transport', location: '', temperature: '', humidity: '', notes: '' })
+    setIsTampered(false)
   }
 
   useEffect(() => {
@@ -360,7 +375,29 @@ export default function EventPage() {
           </Card>
 
           {/* Event Form */}
-          <Card>
+          <div className="space-y-4">
+            {isTampered && batch && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm space-y-2">
+                <div className="flex items-center gap-2 font-bold text-yellow-800">
+                  <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0" />
+                  <span>⚠️ Warning: Blockchain Data Mismatch</span>
+                </div>
+                {detectTamperedFields(batch).map((diff, idx) => (
+                  <div key={idx} className="bg-white/90 p-2.5 rounded-lg border border-yellow-200 space-y-1 text-xs">
+                    <div className="flex items-center justify-between text-gray-700">
+                      <span><strong>Step:</strong> {diff.step}</span>
+                      <span className="font-semibold text-amber-800"><strong>Field:</strong> {diff.field}</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-mono pt-0.5">
+                      <span className="text-gray-600">Before: <span className="line-through text-red-600 font-semibold">{diff.from}</span></span>
+                      <span className="text-gray-400">➔</span>
+                      <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">After: {diff.to}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Card>
             <CardHeader>
               <CardTitle>Log New Event</CardTitle>
               <CardDescription>Record a new event for this batch</CardDescription>
@@ -470,6 +507,7 @@ export default function EventPage() {
               </form>
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
       </div>

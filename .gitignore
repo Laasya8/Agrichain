@@ -20,6 +20,13 @@
 # production
 /build
 
+# hardhat / smart contracts
+/artifacts
+/cache
+
+# project structure documentation
+structure.md
+
 # misc
 .DS_Store
 *.pem
@@ -32,6 +39,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+BLOCKCHAIN_ARCHITECTURE.md
 
 # vercel
 .vercel

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBatchByBatchId, getTraceEventsByBatchId, type Batch, type TraceEvent } from "@/lib/firebase";
 import { formatDate, getEventTypeIcon, getStatusColor } from "@/lib/utils";
-import { getRecord } from "@/lib/blockchain";
+import { getRecord, verifyBatchHash, detectTamperedFields } from "@/lib/blockchain";
 import { VideoDebug } from "@/components/VideoDebug";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {
@@ -53,6 +53,7 @@ export default function VerifyPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [manualBatchId, setManualBatchId] = useState("");
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [isTampered, setIsTampered] = useState(false);
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -115,7 +116,8 @@ export default function VerifyPage() {
     }
 
     return () => {
-      if (stream) stream.getTracks().forEach((track) => track.stop());
+      const currentStream = videoRef.current?.srcObject as MediaStream | null;
+      if (currentStream) currentStream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       if (scanInterval) clearInterval(scanInterval);
     };
   }, [isScanning]);
@@ -167,8 +169,22 @@ export default function VerifyPage() {
 
       // Fetch blockchain proof
       const blockchainResult = await getRecord(batchId);
-      if (blockchainResult.success) {
+      let targetHash = "";
+      if (blockchainResult.success && blockchainResult.hash && blockchainResult.hash !== "") {
         setBlockchainProof(blockchainResult);
+        targetHash = blockchainResult.hash;
+      } else if (batchResult.data.blockchain_hash) {
+        targetHash = batchResult.data.blockchain_hash;
+        setBlockchainProof({
+          success: true,
+          hash: batchResult.data.blockchain_hash,
+          txHash: batchResult.data.blockchain_tx_hash || "Pending/Local Anchor"
+        });
+      }
+
+      if (targetHash) {
+        const verification = verifyBatchHash(batchResult.data, targetHash);
+        setIsTampered(!verification.isMatch);
       }
     } catch (err) {
       console.error("Error fetching batch data:", err);
@@ -197,6 +213,7 @@ export default function VerifyPage() {
     setBlockchainProof(null);
     setManualBatchId("");
     setError(null);
+    setIsTampered(false);
   };
 
   if (batch) {
@@ -280,11 +297,32 @@ export default function VerifyPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {isTampered && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm space-y-2 mb-4">
+                  <div className="flex items-center gap-2 font-bold text-red-800">
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                    <span>Data Tampering Detected</span>
+                  </div>
+                  {detectTamperedFields(batch, events).map((diff, idx) => (
+                    <div key={idx} className="bg-white/90 p-2.5 rounded-lg border border-red-100 space-y-1 text-xs">
+                      <div className="flex items-center justify-between text-gray-700">
+                        <span><strong>Step:</strong> {diff.step}</span>
+                        <span className="font-semibold text-red-700"><strong>Field:</strong> {diff.field}</span>
+                      </div>
+                      <div className="flex items-center gap-2 font-mono pt-0.5">
+                        <span className="text-gray-600">Before: <span className="line-through text-red-600 font-semibold">{diff.from}</span></span>
+                        <span className="text-gray-400">➔</span>
+                        <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">After: {diff.to}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {blockchainProof ? (
                 <>
-                  <div className="flex items-center text-green-600">
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    <span className="font-medium">Verified on Blockchain</span>
+                  <div className={`flex items-center ${isTampered ? 'text-red-600' : 'text-green-600'}`}>
+                    {isTampered ? <AlertTriangle className="w-5 h-5 mr-2" /> : <CheckCircle className="w-5 h-5 mr-2" />}
+                    <span className="font-medium">{isTampered ? 'Verification Failed' : 'Verified on Blockchain'}</span>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">
@@ -429,7 +467,7 @@ export default function VerifyPage() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={['consumer']}>
+    <ProtectedRoute allowedRoles={['consumer', 'farmer', 'aggregator', 'retailer']}>
       <div className="max-w-2xl mx-auto">
       <div className="text-center space-y-4 mb-8">
         <Search className="w-16 h-16 text-green-600 mx-auto" />

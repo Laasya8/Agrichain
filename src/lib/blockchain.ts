@@ -12,7 +12,7 @@ export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x0
 
 // Initialize provider and signer
 export const getProvider = () => {
-  const rpcUrl = process.env.NEXT_PUBLIC_POLYGON_RPC_URL || 'https://rpc-mumbai.maticvigil.com'
+  const rpcUrl = process.env.NEXT_PUBLIC_POLYGON_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com'
   return new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true })
 }
 
@@ -36,6 +36,91 @@ export const generateBatchHash = (batchData: {
 }) => {
   const dataString = JSON.stringify(batchData)
   return ethers.keccak256(ethers.toUtf8Bytes(dataString))
+}
+
+// Verify Firebase Batch against blockchain hash
+export const verifyBatchHash = (firebaseBatch: any, blockchainHash: string) => {
+  const currentHash = generateBatchHash({
+    batchId: firebaseBatch.batch_id,
+    cropName: firebaseBatch.crop_name,
+    location: firebaseBatch.location,
+    harvestDate: firebaseBatch.harvest_date,
+    quantity: Number(firebaseBatch.quantity),
+    farmerId: firebaseBatch.farmer_id
+  })
+  return {
+    isMatch: currentHash.toLowerCase() === blockchainHash.toLowerCase(),
+    currentHash,
+    blockchainHash
+  }
+}
+
+export interface TamperDiff {
+  step: string
+  field: string
+  from: string
+  to: string
+}
+
+export const detectTamperedFields = (batch: any, events: any[] = []): TamperDiff[] => {
+  const diffs: TamperDiff[] = []
+  const initial = batch.initial_data
+  const harvestEvent = Array.isArray(events) ? events.find((e: any) => e.event_type === 'harvest') : null
+
+  // Check location (using initial_data or original harvest event location)
+  const originalLocation = initial?.location || harvestEvent?.location
+  if (originalLocation && originalLocation !== batch.location) {
+    diffs.push({
+      step: 'Step 1: Initial Harvest & Farm Origin',
+      field: 'Farm Harvest Location',
+      from: `${originalLocation} (Original Farm Location)`,
+      to: `${batch.location} (Tampered Current Location)`
+    })
+  }
+
+  // Check quantity
+  const originalQuantity = initial?.quantity
+  if (originalQuantity !== undefined && Number(originalQuantity) !== Number(batch.quantity)) {
+    diffs.push({
+      step: 'Step 1: Initial Harvest & Farm Origin',
+      field: 'Harvest Crop Quantity',
+      from: `${originalQuantity} ${initial?.unit || batch.unit} (Original Quantity)`,
+      to: `${batch.quantity} ${batch.unit} (Tampered Quantity)`
+    })
+  }
+
+  // Check crop name
+  const originalCrop = initial?.crop_name
+  if (originalCrop && originalCrop !== batch.crop_name) {
+    diffs.push({
+      step: 'Step 1: Initial Harvest & Farm Origin',
+      field: 'Crop Name Specification',
+      from: `${originalCrop} (Original Crop)`,
+      to: `${batch.crop_name} (Tampered Crop)`
+    })
+  }
+
+  // Check harvest date
+  const originalDate = initial?.harvest_date
+  if (originalDate && originalDate !== batch.harvest_date) {
+    diffs.push({
+      step: 'Step 1: Initial Harvest & Farm Origin',
+      field: 'Harvest Date Timestamp',
+      from: `${originalDate} (Original Date)`,
+      to: `${batch.harvest_date} (Tampered Date)`
+    })
+  }
+
+  if (diffs.length === 0) {
+    diffs.push({
+      step: 'Step 1: Initial Harvest & Farm Origin',
+      field: 'Farm Origin Data Specs',
+      from: `Anchored Blockchain Record`,
+      to: `Current Database Value (${batch.location}, ${batch.quantity} ${batch.unit})`
+    })
+  }
+
+  return diffs
 }
 
 // Generate hash for event data

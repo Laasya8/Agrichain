@@ -53,7 +53,9 @@ export interface Batch {
   unit: string
   qr_code: string
   ipfs_hash?: string
+  blockchain_hash?: string
   blockchain_tx_hash?: string
+  initial_data?: Record<string, any>
   status: 'active' | 'recalled' | 'completed'
   created_at: string
   updated_at: string
@@ -111,9 +113,24 @@ export const createBatch = async (batchData: Omit<Batch, 'id' | 'created_at' | '
   }
 };
 
-export const getBatchByBatchId = async (batchId: string) => {
+export const getBatchByBatchId = async (batchIdInput: string) => {
   try {
-    // Fetch all batches and filter client-side (works without Firebase index)
+    let cleanId = decodeURIComponent(batchIdInput).trim();
+    
+    // Extract batchId if full URL was scanned
+    try {
+      if (cleanId.startsWith('http://') || cleanId.startsWith('https://')) {
+        const url = new URL(cleanId);
+        if (url.searchParams.get('batch_id')) {
+          cleanId = url.searchParams.get('batch_id') || cleanId;
+        } else {
+          cleanId = url.pathname.split('/').pop() || cleanId;
+        }
+      }
+    } catch {
+      // not a URL
+    }
+
     const batchesRef = ref(db, 'batches');
     const snapshot = await get(batchesRef);
 
@@ -123,10 +140,15 @@ export const getBatchByBatchId = async (batchId: string) => {
 
     const batchesData = snapshot.val();
 
-    // Find the batch with matching batch_id
+    // Find batch with matching batch_id or key
     for (const key in batchesData) {
-      if (batchesData[key].batch_id === batchId) {
-        return { success: true, data: { id: key, ...batchesData[key] } as Batch };
+      const item = batchesData[key];
+      if (
+        item.batch_id === cleanId || 
+        key === cleanId || 
+        item.batch_id?.toLowerCase() === cleanId.toLowerCase()
+      ) {
+        return { success: true, data: { id: key, ...item } as Batch };
       }
     }
 

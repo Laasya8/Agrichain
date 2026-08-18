@@ -19,7 +19,7 @@ import {
   getStatusColor,
   computeTraceEventsSha256,
 } from "@/lib/utils";
-import { getRecord } from "@/lib/blockchain";
+import { getRecord, verifyBatchHash, detectTamperedFields } from "@/lib/blockchain";
 import {
   Shield,
   CheckCircle,
@@ -62,6 +62,7 @@ export default function ConsumerBatchPage() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isTampered, setIsTampered] = useState(false);
 
   const fetchBatchData = useCallback(async () => {
     setIsLoading(true);
@@ -98,8 +99,22 @@ export default function ConsumerBatchPage() {
 
       // Fetch blockchain proof
       const blockchainResult = await getRecord(batchId);
-      if (blockchainResult.success) {
+      let targetHash = "";
+      if (blockchainResult.success && blockchainResult.hash && blockchainResult.hash !== "") {
         setBlockchainProof(blockchainResult);
+        targetHash = blockchainResult.hash;
+      } else if (batchResult.data.blockchain_hash) {
+        targetHash = batchResult.data.blockchain_hash;
+        setBlockchainProof({
+          success: true,
+          hash: batchResult.data.blockchain_hash,
+          txHash: batchResult.data.blockchain_tx_hash || "Pending/Local Anchor"
+        });
+      }
+
+      if (targetHash) {
+        const verification = verifyBatchHash(batchResult.data, targetHash);
+        setIsTampered(!verification.isMatch);
       }
     } catch (err) {
       console.error("Error fetching batch data:", err);
@@ -192,6 +207,29 @@ export default function ConsumerBatchPage() {
       className="container mx-auto px-4 py-12"
     >
       <div className="max-w-6xl mx-auto space-y-12">
+        {isTampered && batch && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 font-bold text-red-800 text-base">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+              <span>Data Tampering Detected</span>
+            </div>
+            <div className="grid gap-2">
+              {detectTamperedFields(batch, events).map((diff, idx) => (
+                <div key={idx} className="bg-white/95 p-3 rounded-xl border border-red-100 space-y-1.5 text-sm">
+                  <div className="flex flex-wrap items-center justify-between text-gray-700">
+                    <span><strong>Step:</strong> {diff.step}</span>
+                    <span className="font-semibold text-red-700"><strong>Field:</strong> {diff.field}</span>
+                  </div>
+                  <div className="flex items-center gap-3 font-mono pt-1">
+                    <span className="text-gray-600">Before: <span className="line-through text-red-600 font-semibold">{diff.from}</span></span>
+                    <span className="text-gray-400">➔</span>
+                    <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">After: {diff.to}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Verification Header */}
         <div className="text-center space-y-6">
           <motion.div

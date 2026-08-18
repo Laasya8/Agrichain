@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { getAllBatches, getTraceEventsByBatchId, updateBatchStatus, type Batch, type TraceEvent } from "@/lib/firebase";
 import { formatDate } from "@/lib/utils";
+import { getRecord, verifyBatchHash, detectTamperedFields } from "@/lib/blockchain";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {
   Package,
@@ -59,6 +60,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [batchEvents, setBatchEvents] = useState<TraceEvent[]>([]);
+  const [isBatchTampered, setIsBatchTampered] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -128,9 +130,24 @@ export default function DashboardPage() {
     }
   };
 
-  const handleViewBatch = (batch: Batch) => {
+  const handleViewBatch = async (batch: Batch) => {
     setSelectedBatch(batch);
+    setIsBatchTampered(false);
     fetchBatchEvents(batch.batch_id);
+
+    try {
+      const blockchainResult = await getRecord(batch.batch_id);
+      const targetHash = (blockchainResult.success && blockchainResult.hash && blockchainResult.hash !== "")
+        ? blockchainResult.hash
+        : batch.blockchain_hash;
+
+      if (targetHash) {
+        const verification = verifyBatchHash(batch, targetHash);
+        setIsBatchTampered(!verification.isMatch);
+      }
+    } catch (err) {
+      console.error("Error checking tamper status in dashboard:", err);
+    }
   };
 
   const handleSearch = (query: string) => {
@@ -448,6 +465,33 @@ export default function DashboardPage() {
               </div>
 
               <div className="p-6 space-y-6">
+                {isBatchTampered && selectedBatch && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-red-800">
+                      <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>Data Tampering Detected</span>
+                    </div>
+                    {detectTamperedFields(selectedBatch, batchEvents).map((diff, idx) => (
+                      <div key={idx} className="bg-white/90 p-2.5 rounded-lg border border-red-100 space-y-1 text-xs">
+                        <div className="flex items-center justify-between text-gray-700">
+                          <span><strong>Step:</strong> {diff.step}</span>
+                          <span className="font-semibold text-red-700"><strong>Field:</strong> {diff.field}</span>
+                        </div>
+                        <div className="flex items-center gap-2 font-mono pt-0.5">
+                          <span className="text-gray-600">Before: <span className="line-through text-red-600 font-semibold">{diff.from}</span></span>
+                          <span className="text-gray-400">➔</span>
+                          <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">After: {diff.to}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!isBatchTampered && selectedBatch.blockchain_hash && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                    <span className="text-green-800 font-semibold text-sm">✅ Verified Authentic on Blockchain</span>
+                  </div>
+                )}
                 <div className="grid md:grid-cols-2 gap-6">
                   {/* Batch Info */}
                   <div className="space-y-4">

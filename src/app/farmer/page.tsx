@@ -92,7 +92,33 @@ export default function FarmerPage() {
       // Generate unique batch ID
       const batchId = generateBatchId()
 
-      // Create batch data
+      // Generate blockchain hash
+      const initialHash = generateBatchHash({
+        batchId,
+        cropName: formData.cropName,
+        location: formData.location,
+        harvestDate: formData.harvestDate,
+        quantity: parseFloat(formData.quantity),
+        farmerId: user.id
+      })
+
+      // Anchor to blockchain via API route
+      let txHash = ''
+      try {
+        const anchorRes = await fetch('/api/anchor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ batchId, hash: initialHash })
+        })
+        const anchorData = await anchorRes.json()
+        if (anchorData.success) {
+          txHash = anchorData.txHash
+        }
+      } catch (anchorErr) {
+        console.warn('Automatic blockchain anchoring failed:', anchorErr)
+      }
+
+      // Create batch data with blockchain hash, tx, and initial_data spec
       const batchData = {
         batch_id: batchId,
         farmer_id: user.id,
@@ -102,18 +128,17 @@ export default function FarmerPage() {
         quantity: parseFloat(formData.quantity),
         unit: formData.unit,
         qr_code: `${window.location.origin}/consumer/${batchId}`,
+        blockchain_hash: initialHash,
+        blockchain_tx_hash: txHash,
+        initial_data: {
+          crop_name: formData.cropName,
+          location: formData.location,
+          harvest_date: formData.harvestDate,
+          quantity: parseFloat(formData.quantity),
+          unit: formData.unit
+        },
         status: 'active' as const
       }
-
-      // Generate blockchain hash (for future blockchain integration)
-      generateBatchHash({
-        batchId,
-        cropName: formData.cropName,
-        location: formData.location,
-        harvestDate: formData.harvestDate,
-        quantity: parseFloat(formData.quantity),
-        farmerId: user.id
-      })
 
       // Insert into Firebase
       const result = await createBatch(batchData)
@@ -135,7 +160,7 @@ export default function FarmerPage() {
         console.error('Error creating harvest event:', eventResult.error)
       }
 
-      setCreatedBatch({ ...batchData, id: result.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      setCreatedBatch({ ...batchData, id: result.id || '', created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
 
       // Reset form
       setFormData({
@@ -321,7 +346,7 @@ export default function FarmerPage() {
                     <Download className="w-4 h-4 mr-2" />
                     Download
                   </Button>
-                  {navigator.share && (
+                  {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
                     <Button onClick={handleShare} variant="outline">
                       <Share2 className="w-4 h-4 mr-2" />
                       Share
